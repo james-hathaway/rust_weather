@@ -5,11 +5,11 @@ use tokio;
 use serde::Deserialize;
 
 
-pub struct Config {
+pub struct Config { // using a struct to store the URL
     pub base_url: String,
 }
 
-impl Config {
+impl Config { //implement the config to a function, where it returns itself as the URL to a string
     pub fn new() -> Self {
         Config {
             base_url: "https://api.open-meteo.com/v1/forecast".to_string(), // Open-Meteo API URL
@@ -17,27 +17,27 @@ impl Config {
     }
 }
 
-async fn fetch_weather_data(config: &Config, location: &str) -> Result<WeatherData, Error> {
+async fn fetch_weather_data(config: &Config, location: &str) -> Result<WeatherData, Error> { //reference config, location and return the result with error handliong
     let geonames_username = "jrh230";
 
-    // Parse the latitude and longitude
-    let latitude = location.split(",").collect::<Vec<&str>>()[0];
+    //parse the latitude and longitude
+    let latitude = location.split(",").collect::<Vec<&str>>()[0]; //when the comma is input, split the two coordinates to a vector
     let longitude = location.split(",").collect::<Vec<&str>>()[1];
 
-    // Construct the URL for the GeoNames Timezone API
-    let timezone_api_url = format!(
+    //construct the URL for the GeoNames Timezone API
+    let timezone_api_url = format!( // use of the format macro to make it cleaner
         "http://api.geonames.org/timezoneJSON?lat={}&lng={}&username={}",
         latitude, longitude, geonames_username
     );
 
-    // Send a GET request to the GeoNames API
+    //send request to the GeoNames API
     let timezone_response = reqwest::get(&timezone_api_url).await?;
     let timezone_data: Value = timezone_response.json().await?;
 
 
 
-    // Extract the timezone ID from the API response
-    let timezone_id = match timezone_data.get("timezoneId") {
+    // get the timezone ID from the API response
+    let timezone_id = match timezone_data.get("timezoneId") { //taking advantage of the some/none structure I learned about recently
         Some(id) => id.as_str().unwrap(),
         None => {
             println!("Failed to fetch timezone data");
@@ -46,21 +46,21 @@ async fn fetch_weather_data(config: &Config, location: &str) -> Result<WeatherDa
     };
     
 
-    // Construct the URL for the Open-Meteo API
     let url = format!(
         "{}?latitude={}&longitude={}&timezone={}&daily=temperature_2m_min,temperature_2m_max",
         config.base_url, latitude, longitude, timezone_id
     );
 
-    // Send a GET request to the Open-Meteo API
+    // send request to the Open-Meteo API
     let response = reqwest::get(&url).await?;
     let weather_data: WeatherData = response.json().await?;
     Ok(weather_data)
 
 }
 
-#[derive(Deserialize, Debug)]
-struct WeatherData {
+#[derive(Deserialize, Debug)] //thanks GPT for showing me what this stuff means and how to use it! LOL
+#[allow(dead_code)]
+struct WeatherData { // elegantly storing my data
     daily: DailyData,
     daily_units: DailyUnits,
     elevation: f32,
@@ -80,6 +80,7 @@ struct DailyData {
 }
 
 #[derive( Deserialize, Debug)]
+#[allow(dead_code)] // threw these in when I changed the data to print out farenheit not celsius
 struct DailyUnits {
     temperature_2m_max: String,
     temperature_2m_min: String,
@@ -98,16 +99,10 @@ fn print_weather_data(location: &str, weather_data: &WeatherData) {
 
     for (i, time) in weather_data.daily.time.iter().enumerate() {
         println!("Date: {}", time);
-        println!(
-            "Max Temperature: {} {}",
-            weather_data.daily.temperature_2m_max[i],
-            weather_data.daily_units.temperature_2m_max
-        );
-        println!(
-            "Min Temperature: {} {}",
-            weather_data.daily.temperature_2m_min[i],
-            weather_data.daily_units.temperature_2m_min
-        );
+        let max_temp_f = weather_data.daily.temperature_2m_max[i] * 9.0/5.0 + 32.0; // cus im american
+        let min_temp_f = weather_data.daily.temperature_2m_min[i] * 9.0/5.0 + 32.0;
+        println!("Max Temperature: {} F", max_temp_f);
+        println!("Min Temperature: {} F", min_temp_f);
         println!("");
     }
 }
